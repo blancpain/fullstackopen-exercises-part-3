@@ -24,6 +24,7 @@
   "homepage": "https://github.com/blancpain/fullstackopen-exercises-part-3#readme",
   "devDependencies": {
     "@flydotio/dockerfile": "^0.2.16",
+    "eslint": "^8.44.0",
     "nodemon": "^2.0.22"
   },
   "dependencies": {

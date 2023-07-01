@@ -5,7 +5,7 @@ const cors = require("cors");
 const app = express();
 const Person = require("./models/person");
 
-morgan.token("contents", function (req, res) {
+morgan.token("contents", function (req) {
   return JSON.stringify(req.body);
 });
 
@@ -18,11 +18,11 @@ app.use(
 );
 app.use(express.static("build"));
 
-const errorHandler = (error, request, response, next) => {
-  console.error(error.message);
-
+const errorHandler = (error, response, next) => {
   if (error.name === "CastError") {
     return response.status(400).send({ error: "malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({ error: error.message });
   }
 
   next(error);
@@ -46,7 +46,7 @@ app.get("/api/persons/:id", (req, res, next) => {
     .catch((error) => next(error));
 });
 
-app.get("/info", (req, res) => {
+app.get("/info", (req, res, next) => {
   const date = new Date().toString();
   Person.countDocuments({})
     .then((count) => {
@@ -57,7 +57,7 @@ app.get("/info", (req, res) => {
     .catch((error) => next(error));
 });
 
-app.post(`/api/persons`, (req, res) => {
+app.post(`/api/persons`, (req, res, next) => {
   const body = req.body;
 
   if (!body.name || !body.number) {
@@ -71,16 +71,12 @@ app.post(`/api/persons`, (req, res) => {
     number: `${body.number}`,
   });
 
-  person.save().then((result) => {
-    res.json(result);
-  });
-  // const personExists = persons.some((p) => p.name === body.name);
-
-  // if (personExists) {
-  //   return res.status(400).json({
-  //     error: "Name must be unique",
-  //   });
-  // }
+  person
+    .save()
+    .then((result) => {
+      res.json(result);
+    })
+    .catch((error) => next(error));
 });
 
 app.put("/api/persons/:id", (request, response, next) => {
@@ -91,7 +87,11 @@ app.put("/api/persons/:id", (request, response, next) => {
     number: body.number,
   };
 
-  Person.findByIdAndUpdate(request.params.id, person, { new: true })
+  Person.findByIdAndUpdate(request.params.id, person, {
+    new: true,
+    runValidators: true,
+    context: "query",
+  })
     .then((updatedPerson) => {
       response.json(updatedPerson);
     })
@@ -100,7 +100,7 @@ app.put("/api/persons/:id", (request, response, next) => {
 
 app.delete("/api/persons/:id", (req, res, next) => {
   Person.findByIdAndDelete(req.params.id)
-    .then((result) => {
+    .then(() => {
       res.status(204).end();
     })
     .catch((error) => next(error));
